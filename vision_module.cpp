@@ -107,3 +107,29 @@ std::string VisionModule::getFaceFeature() {
     // 提取第一个人脸的特征
     dlib::full_object_detection shape = shape_predictor(dlib_frame, faces[0]);
     dlib::
+
+    // 在vision_module.cpp末尾添加
+#include <iostream>
+#include <opencv2/opencv.hpp>
+int main() {
+    // 测试摄像头读取
+    cv::VideoCapture cap(1);  // 树莓派摄像头设备号为1
+    if (!cap.isOpened()) {
+        std::cerr << "摄像头打开失败！检查摄像头是否连接/启用" << std::endl;
+        return 1;
+    }
+    // 读取一帧图像
+    cv::Mat frame;
+    cap >> frame;
+    if (frame.empty()) {
+        std::cerr << "读取图像失败！" << std::endl;
+        return 1;
+    }
+    // 保存图像到本地（验证）
+    cv::imwrite("test_camera.jpg", frame);
+    std::cout << "摄像头测试成功，已保存图像test_camera.jpg" << std::endl;
+
+    // 测试你的视觉识别函数（如detect_object）
+    // detect_object(frame);  // 调用你的识别函数
+    return 0;
+}
