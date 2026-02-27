@@ -20,32 +20,32 @@ std::string MemoryDB::md5(const std::string& input) {
 // 构造函数：初始化数据库连接（修复目录创建逻辑）
 MemoryDB::MemoryDB(const std::string& path) : db(nullptr), db_path(path) {
     // 处理目录创建：兼容相对路径/绝对路径
-    std::string dir;
-    size_t last_slash = db_path.find_last_of('/');
-    if (last_slash != std::string::npos) {
-        dir = db_path.substr(0, last_slash);
-    } else {
-        dir = "."; // 相对路径，使用当前目录
-    }
+    // std::string dir;
+    // size_t last_slash = db_path.find_last_of('/');
+    // if (last_slash != std::string::npos) {
+    //     dir = db_path.substr(0, last_slash);
+    // } else {
+    //     dir = "."; // 相对路径，使用当前目录
+    // }
 
-    // 创建目录（递归创建，确保存在）
-    struct stat st;
-    if (stat(dir.c_str(), &st) != 0) {
-        if (mkdir(dir.c_str(), 0777) != 0) {
-            std::cerr << "目录创建失败: " << dir << " (" << strerror(errno) << ")" << std::endl;
-        } else {
-            std::cout << "目录创建成功: " << dir << std::endl;
-        }
-    }
+    // // 创建目录（递归创建，确保存在）
+    // struct stat st;
+    // if (stat(dir.c_str(), &st) != 0) {
+    //     if (mkdir(dir.c_str(), 0777) != 0) {
+    //         std::cerr << "目录创建失败: " << dir << " (" << strerror(errno) << ")" << std::endl;
+    //     } else {
+    //         std::cout << "目录创建成功: " << dir << std::endl;
+    //     }
+    // }
 
     // 打开数据库
-    int rc = sqlite3_open(db_path.c_str(), &db);
+   int rc = sqlite3_open(":memory:", &db); 
     if (rc != SQLITE_OK) {
         std::cerr << "数据库打开失败：" << sqlite3_errmsg(db) << std::endl;
         sqlite3_close(db);
         db = nullptr;
     } else {
-        std::cout << "数据库打开成功: " << db_path << std::endl;
+        std::cout << "内存数据库打开成功（无需磁盘文件）" << std::endl;
     }
 }
 
@@ -278,8 +278,7 @@ std::vector<ConversationMem> MemoryDB::getUserContextMem(const std::string& uid,
 
 // 测试主函数
 int main() {
-    // 使用绝对路径避免权限问题（替换为你的实际路径）
-    std::string db_path = "/home/addshark/Desktop/addshark/MemoryRobot/test.db";
+    std::string db_path = "test.db"; 
     MemoryDB db(db_path);
     
     // 检查数据库是否打开
