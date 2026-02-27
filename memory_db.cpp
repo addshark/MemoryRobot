@@ -188,3 +188,25 @@ std::vector<ConversationMem> MemoryDB::getUserContextMem(const std::string& uid,
 
     return mems;
 }
+// 在memory_db.cpp末尾添加
+#include <iostream>
+int main() {
+    // 示例：调用你的数据库初始化/插入/查询函数
+    if (init_db("test.db")) {  // 假设你有init_db初始化函数
+        std::cout << "数据库初始化成功" << std::endl;
+        // 测试插入数据
+        if (insert_memory("test_key", "test_value")) {  // 假设你有insert_memory插入函数
+            std::cout << "数据插入成功" << std::endl;
+            // 测试查询数据
+            std::string value = query_memory("test_key");  // 假设你有query_memory查询函数
+            std::cout << "查询结果：" << value << std::endl;
+        } else {
+            std::cerr << "数据插入失败" << std::endl;
+            return 1;
+        }
+    } else {
+        std::cerr << "数据库初始化失败" << std::endl;
+        return 1;
+    }
+    return 0;
+}
