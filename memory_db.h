@@ -29,21 +29,24 @@ struct UserProfile {
     time_t create_time;
 };
 
-// memory_db.h 中补充声明
 class MemoryDB {
 private:
-    sqlite3* db;
-    std::string db_path;
+    sqlite3* db;          // 声明顺序1
+    std::string db_path;  // 声明顺序2
     std::string md5(const std::string& input);  // 已有的MD5方法
 
 public:
     MemoryDB(const std::string& path);
     ~MemoryDB();  // 析构函数：关闭数据库
-    bool init_db();  // 初始化数据库（创建表）
-    bool insert_memory(const std::string& key, const std::string& value);  // 插入数据
-    std::string query_memory(const std::string& key);  // 查询数据
+    bool initDB();  // 统一为驼峰命名（和实现一致）
+    bool insert_memory(const std::string& key, const std::string& value);  // 补充实现
+    std::string query_memory(const std::string& key);  // 补充实现
     bool is_open() const;  // 检查数据库是否打开
-};
 
+    // 原有函数声明
+    std::string getUserUID(const std::string& face_feature);
+    bool saveConversationMem(const ConversationMem& mem);
+    std::vector<ConversationMem> getUserContextMem(const std::string& uid, int top_k);
+};
 
 #endif // MEMORY_DB_H
