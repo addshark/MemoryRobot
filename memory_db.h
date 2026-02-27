@@ -29,31 +29,21 @@ struct UserProfile {
     time_t create_time;
 };
 
+// memory_db.h 中补充声明
 class MemoryDB {
 private:
     sqlite3* db;
     std::string db_path;
-
-    // MD5哈希生成UID（和Python版一致）
-    std::string md5(const std::string& input);
+    std::string md5(const std::string& input);  // 已有的MD5方法
 
 public:
-    // 构造函数：初始化数据库连接
-    MemoryDB(const std::string& path = "/var/lib/robot_memory_cpp.db");
-    // 析构函数：关闭数据库连接
-    ~MemoryDB();
-
-    // 初始化数据库（创建表）
-    bool initDB();
-
-    // 获取/生成用户UID（绑定人脸特征）
-    std::string getUserUID(const std::string& face_feature);
-
-    // 保存对话记忆
-    bool saveConversationMem(const ConversationMem& mem);
-
-    // 获取用户上下文记忆（用于豆包API上下文）
-    std::vector<ConversationMem> getUserContextMem(const std::string& uid, int top_k = 5);
+    MemoryDB(const std::string& path);
+    ~MemoryDB();  // 析构函数：关闭数据库
+    bool init_db();  // 初始化数据库（创建表）
+    bool insert_memory(const std::string& key, const std::string& value);  // 插入数据
+    std::string query_memory(const std::string& key);  // 查询数据
+    bool is_open() const;  // 检查数据库是否打开
 };
+
 
 #endif // MEMORY_DB_H

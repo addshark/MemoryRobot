@@ -45,8 +45,16 @@ MemoryDB::~MemoryDB() {
 
 // 初始化数据库（创建表）
 bool MemoryDB::initDB() {
-    if (!db) return false;
-
+    if (!db) {
+        // 打开数据库
+        int rc = sqlite3_open(db_path.c_str(), &db);
+        if (rc != SQLITE_OK) {
+            std::cerr << "打开数据库失败: " << sqlite3_errmsg(db) << std::endl;
+            sqlite3_close(db);
+            db = nullptr;
+            return false;
+        }
+    }
     // 1. 创建用户档案表
     const char* create_user_sql = R"(
         CREATE TABLE IF NOT EXISTS user_profile (
@@ -191,22 +199,27 @@ std::vector<ConversationMem> MemoryDB::getUserContextMem(const std::string& uid,
 // 在memory_db.cpp末尾添加
 #include <iostream>
 int main() {
-    // 示例：调用你的数据库初始化/插入/查询函数
-    if (init_db("test.db")) {  // 假设你有init_db初始化函数
-        std::cout << "数据库初始化成功" << std::endl;
-        // 测试插入数据
-        if (insert_memory("test_key", "test_value")) {  // 假设你有insert_memory插入函数
-            std::cout << "数据插入成功" << std::endl;
-            // 测试查询数据
-            std::string value = query_memory("test_key");  // 假设你有query_memory查询函数
-            std::cout << "查询结果：" << value << std::endl;
+    // 实例化MemoryDB对象
+    MemoryDB db("test.db");
+    
+    // 初始化数据库
+    if (db.init_db()) {
+        // 插入数据
+        if (db.insert_memory("test_key", "test_value")) {
+            // 查询数据
+            std::string value = db.query_memory("test_key");
+            if (!value.empty()) {
+                std::cout << "查询结果: " << value << std::endl;
+            } else {
+                std::cerr << "查询不到数据" << std::endl;
+            }
         } else {
-            std::cerr << "数据插入失败" << std::endl;
-            return 1;
+            std::cerr << "插入数据失败" << std::endl;
         }
     } else {
-        std::cerr << "数据库初始化失败" << std::endl;
+        std::cerr << "初始化数据库失败" << std::endl;
         return 1;
     }
+
     return 0;
 }
