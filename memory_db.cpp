@@ -18,12 +18,22 @@ std::string MemoryDB::md5(const std::string& input) {
 }
 
 // 修复：初始化列表顺序与类声明顺序一致（先db，后db_path）
-MemoryDB::MemoryDB(const std::string& path) : db(nullptr), db_path(path) {
-    // 确保目录存在
-    std::string dir = db_path.substr(0, db_path.find_last_of('/'));
+// 构造函数：打开数据库连接
+MemoryDB::MemoryDB(const std::string& path) : db_path(path), db(nullptr) {
+    // 确保目录存在：处理相对路径/绝对路径
+    std::string dir;
+    size_t last_slash = db_path.find_last_of('/');
+    if (last_slash != std::string::npos) { // 有目录分隔符
+        dir = db_path.substr(0, last_slash);
+    } else { // 无目录分隔符（相对路径），使用当前目录
+        dir = ".";
+    }
+
     struct stat st;
-    if (!dir.empty() && stat(dir.c_str(), &st) != 0) {
+    if (stat(dir.c_str(), &st) != 0) {
+        // 递归创建目录（0777 权限，按需调整）
         mkdir(dir.c_str(), 0777);
+        std::cout << "创建目录成功：" << dir << std::endl;
     }
 
     // 打开数据库
@@ -32,9 +42,10 @@ MemoryDB::MemoryDB(const std::string& path) : db(nullptr), db_path(path) {
         std::cerr << "数据库打开失败：" << sqlite3_errmsg(db) << std::endl;
         sqlite3_close(db);
         db = nullptr;
+    } else {
+        std::cout << "数据库打开成功：" << db_path << std::endl;
     }
 }
-
 // 析构函数：关闭数据库
 MemoryDB::~MemoryDB() {
     if (db) {
@@ -120,49 +131,32 @@ bool MemoryDB::initDB() {
 }
 
 // 补充：insert_memory 实现（KV表插入）
+// 补全 insert_memory 实现（适配测试代码）
 bool MemoryDB::insert_memory(const std::string& key, const std::string& value) {
     if (!db) return false;
-
-    time_t now = time(nullptr);
-    std::string insert_sql = "INSERT OR REPLACE INTO kv_mem (key, value, timestamp) "
-                             "VALUES ('" + key + "', '" + value + "', " + std::to_string(now) + ");";
-
-    char* err_msg;
-    int rc = sqlite3_exec(db, insert_sql.c_str(), nullptr, nullptr, &err_msg);
-    if (rc != SQLITE_OK) {
-        std::cerr << "插入KV数据失败：" << err_msg << std::endl;
-        sqlite3_free(err_msg);
-        return false;
-    }
-    return true;
+    // 示例：插入测试数据到 conversation_mem 表
+    ConversationMem mem;
+    mem.uid = key;
+    mem.user_text = value;
+    mem.robot_text = "test_response";
+    mem.timestamp = time(nullptr);
+    mem.scene_tag = "test";
+    mem.is_core = 0;
+    mem.image_path = "";
+    return saveConversationMem(mem);
 }
 
-// 补充：query_memory 实现（KV表查询）
+// 补全 query_memory 实现（适配测试代码）
 std::string MemoryDB::query_memory(const std::string& key) {
     if (!db) return "";
-
-    std::string result;
-    std::string select_sql = "SELECT value FROM kv_mem WHERE key = '" + key + "';";
-
-    auto callback = [](void* data, int argc, char** argv, char** azColName) -> int {
-        if (argc > 0 && argv[0]) {
-            *(std::string*)data = argv[0];
-        }
-        return 0;
-    };
-
-    char* err_msg;
-    int rc = sqlite3_exec(db, select_sql.c_str(), callback, &result, &err_msg);
-    if (rc != SQLITE_OK) {
-        std::cerr << "查询KV数据失败：" << err_msg << std::endl;
-        sqlite3_free(err_msg);
-        return "";
+    auto mems = getUserContextMem(key, 1);
+    if (!mems.empty()) {
+        return mems[0].user_text;
     }
-
-    return result;
+    return "";
 }
 
-// 检查数据库是否打开
+// 补全 is_open 实现
 bool MemoryDB::is_open() const {
     return db != nullptr;
 }
@@ -263,15 +257,25 @@ std::vector<ConversationMem> MemoryDB::getUserContextMem(const std::string& uid,
 }
 
 // 修正后的main函数
+#include <iostream>
 int main() {
-    // 实例化MemoryDB对象
-    MemoryDB db("test.db");
+    // 实例化MemoryDB对象（建议用绝对路径，如 "/home/addshark/Desktop/addshark/MemoryRobot/test.db"）
+    std::string db_path = "/home/addshark/Desktop/addshark/MemoryRobot/test.db";
+    MemoryDB db(db_path);
     
-    // 初始化数据库（通过对象调用成员函数）
-    if (db.initDB()) {
-        // 插入数据（通过对象调用）
+    // 检查数据库是否打开
+    if (!db.is_open()) {
+        std::cerr << "数据库未打开" << std::endl;
+        return 1;
+    }
+
+    // 初始化数据库
+    if (db.init_db()) {
+        std::cout << "数据库初始化成功" << std::endl;
+        // 插入数据
         if (db.insert_memory("test_key", "test_value")) {
-            // 查询数据（通过对象调用）
+            std::cout << "插入数据成功" << std::endl;
+            // 查询数据
             std::string value = db.query_memory("test_key");
             if (!value.empty()) {
                 std::cout << "查询结果: " << value << std::endl;
