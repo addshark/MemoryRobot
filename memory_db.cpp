@@ -3,6 +3,7 @@
 #include <cstring>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <stdexcept>
 
 // MD5哈希实现（生成UID）
 std::string MemoryDB::md5(const std::string& input) {
@@ -13,27 +14,28 @@ std::string MemoryDB::md5(const std::string& input) {
     for (int i = 0; i < MD5_DIGEST_LENGTH; ++i) {
         oss << std::hex << std::setw(2) << std::setfill('0') << (int)digest[i];
     }
-    // 取前20位，和Python版一致
-    return oss.str().substr(0, 20);
+    return oss.str().substr(0, 20); // 取前20位，和Python版一致
 }
 
-// 修复：初始化列表顺序与类声明顺序一致（先db，后db_path）
-// 构造函数：打开数据库连接
-MemoryDB::MemoryDB(const std::string& path) : db_path(path), db(nullptr) {
-    // 确保目录存在：处理相对路径/绝对路径
+// 构造函数：初始化数据库连接（修复目录创建逻辑）
+MemoryDB::MemoryDB(const std::string& path) : db(nullptr), db_path(path) {
+    // 处理目录创建：兼容相对路径/绝对路径
     std::string dir;
     size_t last_slash = db_path.find_last_of('/');
-    if (last_slash != std::string::npos) { // 有目录分隔符
+    if (last_slash != std::string::npos) {
         dir = db_path.substr(0, last_slash);
-    } else { // 无目录分隔符（相对路径），使用当前目录
-        dir = ".";
+    } else {
+        dir = "."; // 相对路径，使用当前目录
     }
 
+    // 创建目录（递归创建，确保存在）
     struct stat st;
     if (stat(dir.c_str(), &st) != 0) {
-        // 递归创建目录（0777 权限，按需调整）
-        mkdir(dir.c_str(), 0777);
-        std::cout << "创建目录成功：" << dir << std::endl;
+        if (mkdir(dir.c_str(), 0777) != 0) {
+            std::cerr << "目录创建失败: " << dir << " (" << strerror(errno) << ")" << std::endl;
+        } else {
+            std::cout << "目录创建成功: " << dir << std::endl;
+        }
     }
 
     // 打开数据库
@@ -43,29 +45,26 @@ MemoryDB::MemoryDB(const std::string& path) : db_path(path), db(nullptr) {
         sqlite3_close(db);
         db = nullptr;
     } else {
-        std::cout << "数据库打开成功：" << db_path << std::endl;
+        std::cout << "数据库打开成功: " << db_path << std::endl;
     }
 }
-// 析构函数：关闭数据库
+
+// 析构函数：释放数据库资源
 MemoryDB::~MemoryDB() {
     if (db) {
         sqlite3_close(db);
         db = nullptr;
+        std::cout << "数据库连接已关闭" << std::endl;
     }
 }
 
 // 初始化数据库（创建表）
-bool MemoryDB::initDB() {
+bool MemoryDB::init_db() {
     if (!db) {
-        // 打开数据库
-        int rc = sqlite3_open(db_path.c_str(), &db);
-        if (rc != SQLITE_OK) {
-            std::cerr << "打开数据库失败: " << sqlite3_errmsg(db) << std::endl;
-            sqlite3_close(db);
-            db = nullptr;
-            return false;
-        }
+        std::cerr << "数据库未打开，无法初始化" << std::endl;
+        return false;
     }
+
     // 1. 创建用户档案表
     const char* create_user_sql = R"(
         CREATE TABLE IF NOT EXISTS user_profile (
@@ -93,7 +92,7 @@ bool MemoryDB::initDB() {
         CREATE INDEX IF NOT EXISTS idx_timestamp ON conversation_mem(timestamp);
     )";
 
-    // 新增：创建测试用的key-value表（用于insert_memory/query_memory）
+    // 3. 创建KV测试表
     const char* create_kv_sql = R"(
         CREATE TABLE IF NOT EXISTS kv_mem (
             key TEXT PRIMARY KEY,
@@ -102,9 +101,11 @@ bool MemoryDB::initDB() {
         );
     )";
 
-    char* err_msg;
+    char* err_msg = nullptr;
+    int rc;
+
     // 执行创建用户表
-    int rc = sqlite3_exec(db, create_user_sql, nullptr, nullptr, &err_msg);
+    rc = sqlite3_exec(db, create_user_sql, nullptr, nullptr, &err_msg);
     if (rc != SQLITE_OK) {
         std::cerr << "创建用户表失败：" << err_msg << std::endl;
         sqlite3_free(err_msg);
@@ -119,7 +120,7 @@ bool MemoryDB::initDB() {
         return false;
     }
 
-    // 执行创建kv表
+    // 执行创建KV表
     rc = sqlite3_exec(db, create_kv_sql, nullptr, nullptr, &err_msg);
     if (rc != SQLITE_OK) {
         std::cerr << "创建KV表失败：" << err_msg << std::endl;
@@ -127,36 +128,54 @@ bool MemoryDB::initDB() {
         return false;
     }
 
+    std::cout << "数据库表初始化成功" << std::endl;
     return true;
 }
 
-// 补充：insert_memory 实现（KV表插入）
-// 补全 insert_memory 实现（适配测试代码）
+// KV插入（测试用）
 bool MemoryDB::insert_memory(const std::string& key, const std::string& value) {
     if (!db) return false;
-    // 示例：插入测试数据到 conversation_mem 表
-    ConversationMem mem;
-    mem.uid = key;
-    mem.user_text = value;
-    mem.robot_text = "test_response";
-    mem.timestamp = time(nullptr);
-    mem.scene_tag = "test";
-    mem.is_core = 0;
-    mem.image_path = "";
-    return saveConversationMem(mem);
+
+    time_t now = time(nullptr);
+    std::string insert_sql = "INSERT OR REPLACE INTO kv_mem (key, value, timestamp) "
+                             "VALUES ('" + key + "', '" + value + "', " + std::to_string(now) + ");";
+
+    char* err_msg = nullptr;
+    int rc = sqlite3_exec(db, insert_sql.c_str(), nullptr, nullptr, &err_msg);
+    if (rc != SQLITE_OK) {
+        std::cerr << "插入KV数据失败：" << err_msg << std::endl;
+        sqlite3_free(err_msg);
+        return false;
+    }
+    return true;
 }
 
-// 补全 query_memory 实现（适配测试代码）
+// KV查询（测试用）
 std::string MemoryDB::query_memory(const std::string& key) {
     if (!db) return "";
-    auto mems = getUserContextMem(key, 1);
-    if (!mems.empty()) {
-        return mems[0].user_text;
+
+    std::string result;
+    std::string select_sql = "SELECT value FROM kv_mem WHERE key = '" + key + "';";
+
+    auto callback = [](void* data, int argc, char** argv, char** azColName) -> int {
+        if (argc > 0 && argv[0]) {
+            *(std::string*)data = argv[0];
+        }
+        return 0;
+    };
+
+    char* err_msg = nullptr;
+    int rc = sqlite3_exec(db, select_sql.c_str(), callback, &result, &err_msg);
+    if (rc != SQLITE_OK) {
+        std::cerr << "查询KV数据失败：" << err_msg << std::endl;
+        sqlite3_free(err_msg);
+        return "";
     }
-    return "";
+
+    return result;
 }
 
-// 补全 is_open 实现
+// 检查数据库是否打开
 bool MemoryDB::is_open() const {
     return db != nullptr;
 }
@@ -166,7 +185,7 @@ std::string MemoryDB::getUserUID(const std::string& face_feature) {
     if (!db) return "unknown_uid";
 
     std::string uid = md5(face_feature);
-    char* err_msg;
+    char* err_msg = nullptr;
     std::string select_sql = "SELECT uid FROM user_profile WHERE uid = '" + uid + "';";
 
     // 回调函数：检查用户是否存在
@@ -196,6 +215,7 @@ std::string MemoryDB::getUserUID(const std::string& face_feature) {
             sqlite3_free(err_msg);
             return "unknown_uid";
         }
+        std::cout << "新建用户成功，UID: " << uid << std::endl;
     }
 
     return uid;
@@ -210,7 +230,7 @@ bool MemoryDB::saveConversationMem(const ConversationMem& mem) {
                              std::to_string(mem.timestamp) + ", '" + mem.scene_tag + "', " + std::to_string(mem.is_core) + 
                              ", '" + mem.image_path + "');";
 
-    char* err_msg;
+    char* err_msg = nullptr;
     int rc = sqlite3_exec(db, insert_sql.c_str(), nullptr, nullptr, &err_msg);
     if (rc != SQLITE_OK) {
         std::cerr << "保存记忆失败：" << err_msg << std::endl;
@@ -245,7 +265,7 @@ std::vector<ConversationMem> MemoryDB::getUserContextMem(const std::string& uid,
         return 0;
     };
 
-    char* err_msg;
+    char* err_msg = nullptr;
     int rc = sqlite3_exec(db, select_sql.c_str(), callback, &mems, &err_msg);
     if (rc != SQLITE_OK) {
         std::cerr << "查询记忆失败：" << err_msg << std::endl;
@@ -256,37 +276,66 @@ std::vector<ConversationMem> MemoryDB::getUserContextMem(const std::string& uid,
     return mems;
 }
 
-// 修正后的main函数
-#include <iostream>
+// 测试主函数
 int main() {
-    // 实例化MemoryDB对象（建议用绝对路径，如 "/home/addshark/Desktop/addshark/MemoryRobot/test.db"）
+    // 使用绝对路径避免权限问题（替换为你的实际路径）
     std::string db_path = "/home/addshark/Desktop/addshark/MemoryRobot/test.db";
     MemoryDB db(db_path);
     
     // 检查数据库是否打开
     if (!db.is_open()) {
-        std::cerr << "数据库未打开" << std::endl;
+        std::cerr << "错误：数据库未打开" << std::endl;
         return 1;
     }
 
     // 初始化数据库
     if (db.init_db()) {
-        std::cout << "数据库初始化成功" << std::endl;
-        // 插入数据
+        std::cout << "=== 数据库初始化成功 ===" << std::endl;
+        
+        // 测试KV插入
         if (db.insert_memory("test_key", "test_value")) {
-            std::cout << "插入数据成功" << std::endl;
-            // 查询数据
+            std::cout << "KV数据插入成功" << std::endl;
+            
+            // 测试KV查询
             std::string value = db.query_memory("test_key");
             if (!value.empty()) {
-                std::cout << "查询结果: " << value << std::endl;
+                std::cout << "KV查询结果: " << value << std::endl;
             } else {
-                std::cerr << "查询不到数据" << std::endl;
+                std::cerr << "KV查询失败：未找到数据" << std::endl;
             }
         } else {
-            std::cerr << "插入数据失败" << std::endl;
+            std::cerr << "KV数据插入失败" << std::endl;
         }
+
+        // 测试用户UID生成
+        std::string face_feature = "test_face_feature_123";
+        std::string uid = db.getUserUID(face_feature);
+        std::cout << "用户UID: " << uid << std::endl;
+
+        // 测试对话记忆保存
+        ConversationMem mem;
+        mem.uid = uid;
+        mem.user_text = "你好，机器人";
+        mem.robot_text = "你好呀！";
+        mem.timestamp = time(nullptr);
+        mem.scene_tag = "home";
+        mem.is_core = 1;
+        mem.image_path = "";
+        if (db.saveConversationMem(mem)) {
+            std::cout << "对话记忆保存成功" << std::endl;
+            
+            // 测试对话记忆查询
+            auto mems = db.getUserContextMem(uid, 5);
+            std::cout << "查询到" << mems.size() << "条记忆：" << std::endl;
+            for (const auto& m : mems) {
+                std::cout << "用户说：" << m.user_text << " | 机器人回复：" << m.robot_text << std::endl;
+            }
+        } else {
+            std::cerr << "对话记忆保存失败" << std::endl;
+        }
+
     } else {
-        std::cerr << "初始化数据库失败" << std::endl;
+        std::cerr << "错误：数据库初始化失败" << std::endl;
         return 1;
     }
 
