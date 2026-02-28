@@ -35,11 +35,6 @@ VisionModule::~VisionModule() {
 
 // 初始化：加载dlib人脸模型（需提前下载模型文件）
 bool VisionModule::init() {
-    // 下载模型文件（树莓派终端执行）：
-    // wget http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2
-    // bunzip2 shape_predictor_68_face_landmarks.dat.bz2
-    // wget http://dlib.net/files/dlib_face_recognition_resnet_model_v1.dat.bz2
-    // bunzip2 dlib_face_recognition_resnet_model_v1.dat.bz2
 
     std::string landmark_model = "/home/pi/shape_predictor_68_face_landmarks.dat";
     std::string rec_model = "/home/pi/dlib_face_recognition_resnet_model_v1.dat";
