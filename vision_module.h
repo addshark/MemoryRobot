@@ -12,15 +12,13 @@
 
 // 2. OpenCV头文件
 #include <opencv2/opencv.hpp>
-
-// 3. dlib头文件（去重+按功能归类）
-#include <dlib/color_space.h>
 #include <dlib/opencv.h>          // OpenCV与dlib图像转换
 #include <dlib/image_processing/frontal_face_detector.h>
 #include <dlib/image_processing.h> // 人脸关键点检测
-#include <dlib/face_recognition/face_recognition_model_v1.h>
-#include <dlib/image_io.h>
-#include <dlib/matrix.h>
+#include <dlib/image_io.h>         // 图像IO
+#include <dlib/matrix.h>           // 矩阵运算
+#include <dlib/dnn.h>              // 神经网络（必须，因为用到face_recognition_model_v1）
+#include "face_recognition_model_v1.h" // 引入自定义的人脸特征模型头文件
 
 class VisionModule {
 private:
