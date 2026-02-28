@@ -55,10 +55,10 @@ public:
     ) const {
         // 提取人脸ROI并归一化（dlib官方逻辑）
         dlib::matrix<T> face_img;
-        extract_image_chip(img, get_face_chip_details(shape, 150, 0.25), face_img);
+        extract_image_chip(img, get_face_chip_details<double>(shape, 150, 0.25), face_img);
         if (num_jitters == 0) {
             // 无抖动：直接前向计算
-            return (*this)(dlib::mean(dlib::to_grayscale(face_img)));
+            return (*this)(dlib::mean(dlib::to_grayscale<dlib::rgb_pixel>(face_img) ));
         } else {
             // 有抖动：多次计算取平均（增强鲁棒性）
             dlib::matrix<float, 0, 1> desc;
@@ -67,7 +67,7 @@ public:
             for (int i = 0; i < num_jitters; ++i) {
                 for (int j = 0; j < num_jitters; ++j) {
                     dlib::matrix<T> temp;
-                    extract_image_chip(img, get_face_chip_details(shape, 150, 0.25, dlib::vector<double>(i-num_jitters/2, j-num_jitters/2)), temp);
+                    extract_image_chip(img, get_face_chip_details<double>(shape, 150, 0.25, dlib::vector<double,3>(i-num_jitters/2, j-num_jitters/2)), temp);
                     desc += (*this)(dlib::mean(dlib::to_grayscale(temp)));
                 }
             }
@@ -96,20 +96,29 @@ private:
     dlib::chip_details get_face_chip_details(
         const dlib::full_object_detection& shape,
         const int size = 150,
-        const double padding = 0.25,
-        const dlib::vector<double>& offset = dlib::vector<double>(0,0)
+        const T padding = 0.25,  // 用模板类型T替代固定double，增强通用性
+        // 关键修改：指定vector为2维（offset是xy偏移，不需要3维）
+        const dlib::vector<T, 2>& offset = dlib::vector<T, 2>(0, 0)
     ) const {
-        DLIB_CASSERT(shape.num_parts() == 68, "必须是68点人脸关键点");
-        dlib::rectangle r = shape.get_rect();
-        // 计算人脸中心
-        dlib::vector<double> center = (r.tl_corner() + r.br_corner()) / 2.0;
-        center += offset;
-        // 计算人脸尺寸（带padding）
-        double width = r.width() * (1 + padding);
-        double height = r.height() * (1 + padding);
-        // 生成chip细节（正方形，适配网络输入150x150）
-        return dlib::chip_details(center, dlib::vector<double>(size, size), dlib::vector<double>(width, height));
-    }
+    DLIB_CASSERT(shape.num_parts() == 68, "必须是68点人脸关键点");
+    dlib::rectangle r = shape.get_rect();
+    
+    // 计算人脸中心（改为模板类型T，避免类型转换）
+    dlib::vector<T, 2> center = (r.tl_corner().cast<T>() + r.br_corner().cast<T>()) / T(2.0);
+    center += offset;
+    
+    // 计算人脸尺寸（带padding）
+    T width = static_cast<T>(r.width()) * (T(1) + padding);
+    T height = static_cast<T>(r.height()) * (T(1) + padding);
+    
+    // 生成chip细节（正方形，适配网络输入150x150）
+    // 关键修改：chip_details的参数统一用模板类型T，避免类型不匹配
+    return dlib::chip_details(
+        center, 
+        dlib::vector<T, 2>(static_cast<T>(size), static_cast<T>(size)), 
+        dlib::vector<T, 2>(width, height)
+    );
+}
 };
 
 // 为了兼容代码中的dlib::face_recognition_model_v1命名

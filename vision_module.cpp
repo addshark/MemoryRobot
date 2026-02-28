@@ -3,7 +3,13 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <sstream>  // 新增：用于特征向量转字符串
-
+// 在vision_module.h/vision_module.cpp开头添加
+#include <dlib/opencv.h>
+#include <dlib/image_processing.h>
+#include <dlib/face_recognition.h>
+#include <dlib/image_io.h>
+#include <dlib/convert_image.h>  // 关键：to_grayscale需要这个头文件
+#include <dlib/matrix.h>
 // 构造函数
 VisionModule::VisionModule(int cam_id, const std::string& save_path) 
     : camera_id(cam_id), save_path(save_path), 
@@ -93,7 +99,7 @@ std::string VisionModule::getFaceFeature() {
     }
 
     // 转换为dlib格式
-    dlib::cv_image<dlib::bgr_pixel> dlib_frame(frame);
+    dlib::cv_image<dlib::bgr_pixel> dlib_frame(cv_mat);  // cv_mat是OpenCV的Mat
     // 检测人脸
     std::vector<dlib::rectangle> faces = face_detector(dlib_frame);
     if (faces.empty()) {
@@ -103,8 +109,11 @@ std::string VisionModule::getFaceFeature() {
     // 提取第一个人脸的特征（补全核心逻辑）
     dlib::full_object_detection shape = shape_predictor(dlib_frame, faces[0]);
     // 生成128维人脸特征向量（dlib核心API）
-    dlib::matrix<float, 0, 1> face_descriptor = face_rec_model.compute_face_descriptor(dlib_frame, shape);
-    
+    dlib::matrix<dlib::bgr_pixel> img_matrix;
+    dlib::assign_image(img_matrix, dlib_frame);  // 转换为matrix类型
+
+    // 调用compute_face_descriptor（补充num_jitters参数，默认1）
+    dlib::matrix<float, 0, 1> face_descriptor = face_rec_model.compute_face_descriptor(img_matrix, shape, 1);
     // 将特征向量转换为字符串（逗号分隔，和Python版格式一致）
     std::ostringstream oss;
     for (int i = 0; i < face_descriptor.size(); ++i) {
