@@ -9,9 +9,9 @@
 #include <string>
 #include <vector>
 #include <ctime>
-#include <dlib/face_recognition.h>
 #include <dlib/image_io.h>
-#include <dlib/convert_image.h>  // 关键：to_grayscale需要这个头文件
+#include <dlib/opencv.h>          // 兼容OpenCV和dlib图像转换
+#include <dlib/image_processing.h> // to_grayscale的核心头文件
 #include <dlib/matrix.h>
 class VisionModule {
 private:
