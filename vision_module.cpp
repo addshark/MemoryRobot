@@ -2,6 +2,7 @@
 #include <iostream>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <sstream>  // 新增：用于特征向量转字符串
 
 // 构造函数
 VisionModule::VisionModule(int cam_id, const std::string& save_path) 
@@ -83,7 +84,7 @@ std::string VisionModule::captureImage() {
     return img_path;
 }
 
-// 提取人脸特征
+// 提取人脸特征（补全完整逻辑）
 std::string VisionModule::getFaceFeature() {
     if (!cap.isOpened()) {
         return "unknown_face";
@@ -104,9 +105,22 @@ std::string VisionModule::getFaceFeature() {
         return "unknown_face";
     }
 
-    // 提取第一个人脸的特征
+    // 提取第一个人脸的特征（补全核心逻辑）
     dlib::full_object_detection shape = shape_predictor(dlib_frame, faces[0]);
-    dlib::
+    // 生成128维人脸特征向量（dlib核心API）
+    dlib::matrix<float, 0, 1> face_descriptor = face_rec_model.compute_face_descriptor(dlib_frame, shape);
+    
+    // 将特征向量转换为字符串（逗号分隔，和Python版格式一致）
+    std::ostringstream oss;
+    for (int i = 0; i < face_descriptor.size(); ++i) {
+        if (i > 0) {
+            oss << ",";  // 逗号分隔每个维度的数值
+        }
+        oss << face_descriptor(i);
+    }
+    
+    // 返回特征字符串（和Python版兼容，可直接存入数据库）
+    return oss.str();
 }
     // 在vision_module.cpp末尾添加
 #include <iostream>
