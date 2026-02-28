@@ -107,7 +107,7 @@ std::string VisionModule::getFaceFeature() {
     // 提取第一个人脸的特征
     dlib::full_object_detection shape = shape_predictor(dlib_frame, faces[0]);
     dlib::
-
+}
     // 在vision_module.cpp末尾添加
 #include <iostream>
 #include <opencv2/opencv.hpp>

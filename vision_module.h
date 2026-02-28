@@ -20,7 +20,7 @@ private:
     dlib::frontal_face_detector face_detector;
     dlib::shape_predictor shape_predictor;
     dlib::face_recognition_model_v1 face_rec_model;
-
+    std::string rec_model = "/home/addshark/robot_venv/lib/python3.12/site-packages/face_recognition_models/models/dlib_face_recognition_resnet_model_v1.dat"; // 补充模型路径
 public:
     // 构造函数：初始化摄像头和人脸模型
     VisionModule(int cam_id = 0, const std::string& save_path = "/home/pi/robot_cpp/images");
