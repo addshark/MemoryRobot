@@ -1,29 +1,38 @@
 #ifndef VISION_MODULE_H
 #define VISION_MODULE_H
 
-#include <opencv2/opencv.hpp>
-#include <dlib/opencv.h>
-#include <dlib/image_processing/frontal_face_detector.h>
-#include <dlib/image_processing.h>
-#include <dlib/face_recognition/face_recognition_model_v1.h>
+// 1. 标准库头文件
 #include <string>
 #include <vector>
 #include <ctime>
+#include <iostream>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <sstream>
+
+// 2. OpenCV头文件
+#include <opencv2/opencv.hpp>
+
+// 3. dlib头文件（去重+按功能归类）
+#include <dlib/color_space.h>
+#include <dlib/opencv.h>          // OpenCV与dlib图像转换
+#include <dlib/image_processing/frontal_face_detector.h>
+#include <dlib/image_processing.h> // 人脸关键点检测
+#include <dlib/face_recognition/face_recognition_model_v1.h>
 #include <dlib/image_io.h>
-#include <dlib/opencv.h>          // 兼容OpenCV和dlib图像转换
-#include <dlib/image_processing.h> // to_grayscale的核心头文件
 #include <dlib/matrix.h>
+
 class VisionModule {
 private:
     cv::VideoCapture cap;
     int camera_id;          // USB摄像头ID，默认0
     std::string save_path;  // 图片保存路径
 
-    // dlib人脸检测和特征提取
+    // dlib人脸检测和特征提取相关对象
     dlib::frontal_face_detector face_detector;
     dlib::shape_predictor shape_predictor;
     dlib::face_recognition_model_v1 face_rec_model;
-    std::string rec_model = "/home/addshark/robot_venv/lib/python3.12/site-packages/face_recognition_models/models/dlib_face_recognition_resnet_model_v1.dat"; // 补充模型路径
+
 public:
     // 构造函数：初始化摄像头和人脸模型
     VisionModule(int cam_id = 0, const std::string& save_path = "/home/pi/robot_cpp/images");
