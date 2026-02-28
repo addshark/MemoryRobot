@@ -12,37 +12,36 @@
 
 // 2. OpenCV头文件
 #include <opencv2/opencv.hpp>
-#include <dlib/opencv.h>          // OpenCV与dlib图像转换
+
+// 3. dlib头文件（适配实际版本，移除color_space.h）
+#include <dlib/opencv.h>          
 #include <dlib/image_processing/frontal_face_detector.h>
-#include <dlib/image_processing.h> // 人脸关键点检测
-#include <dlib/image_io.h>         // 图像IO
-#include <dlib/matrix.h>           // 矩阵运算
-#include <dlib/dnn.h>              // 神经网络（必须，因为用到face_recognition_model_v1）
-#include "face_recognition_model_v1.h" // 引入自定义的人脸特征模型头文件
+#include <dlib/image_processing.h>
+#include <dlib/image_io.h>
+#include <dlib/matrix.h>
+#include <dlib/dnn.h>
+#include <dlib/convert_image.h>    // 新增：to_grayscale依赖
+#include <dlib/geometry.h>         // 新增：point/vector操作依赖
+
+// 引入自定义人脸模型头文件（当前目录）
+#include "face_recognition_model_v1.h"
 
 class VisionModule {
 private:
     cv::VideoCapture cap;
-    int camera_id;          // USB摄像头ID，默认0
-    std::string save_path;  // 图片保存路径
+    int camera_id;          
+    std::string save_path;  
 
-    // dlib人脸检测和特征提取相关对象
+    // dlib核心对象
     dlib::frontal_face_detector face_detector;
     dlib::shape_predictor shape_predictor;
     dlib::face_recognition_model_v1 face_rec_model;
 
 public:
-    // 构造函数：初始化摄像头和人脸模型
-    VisionModule(int cam_id = 0, const std::string& save_path = "/home/pi/robot_cpp/images");
+    VisionModule(int cam_id = 0, const std::string& save_path = "/home/addshark/Desktop/addshark/MemoryRobot/images");
     ~VisionModule();
-
-    // 初始化：加载人脸模型（树莓派需提前下载模型文件）
     bool init();
-
-    // 拍摄图片，返回保存路径
     std::string captureImage();
-
-    // 提取人脸特征，返回特征字符串（逗号分隔）
     std::string getFaceFeature();
 };
 
